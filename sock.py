@@ -4,6 +4,8 @@
 # imports
 import socket
 import sys
+import hashlib
+import binascii
 
 # classes
 
@@ -90,17 +92,30 @@ class SockClient(object):
 
     def __checkMessageParity(self, bits):
         
-        if(bits[:len(bits)-8].count('1') % 2 == 0):
-            print "Message number of 1 bits is Even, checking parity byte..."
-            print "Parity byte is %s" % bits[len(bits)-8:]
+        num_1bits = bits.count('1')
+
+        # Check if parity byte exists
+        if(int(bits[len(bits)-8:]) > 1):
+            print "Parity byte does not exist!"
         else:
-            print "Message number of 1 bits is ODD, checking parity byte..."
-            print "Parity byte is %s" % bits[len(bits)-8:]
+            if(bits[:len(bits)-8].count('1') % 2 == 0):
+                print "Message number of 1 bits is Even (%d), checking parity byte..." % num_1bits
+                print "Parity byte is %s" % bits[len(bits)-8:]
+            else:
+                print "Message number of 1 bits is ODD (%d), checking parity byte..." % num_1bits
+                print "Parity byte is %s" % bits[len(bits)-8:]
         
-        if(bits.count('1') % 2 == 0):
-            print "Even number of 1 bits, message parity is ok"
+        if(num_1bits % 2 == 0):
+            print "Even number of 1 bits (%d), message parity is ok" % num_1bits
         else:
-            print "Odd number of 1 bits, message parity is not ok"
+            print "Odd number of 1 bits (%d), message parity is not ok" % num_1bits
+
+    def __checkDataMD5Sum(self):
+        newmd5 = hashlib.md5(binascii.unhexlify(self.data.encode('hex'))).hexdigest()
+        if(newmd5 == self.md5sum.encode('hex')):
+            print "Data MD5 sum is OK %s == %s" %  (self.md5sum.encode('hex'), newmd5)
+        else:
+            print "Data MD5 sum is NOT ok %s != %s" % (self.md5sum.encode('hex'), newmd5)
 
     def getMessage(self):
         self.__getPacketLength()
@@ -114,14 +129,14 @@ class SockClient(object):
         binarymessage = (bin(int(self.message.encode('hex'), 16))[2:]).zfill(bmsize)
         
         self.__checkMessageParity(binarymessage)
-        
-        num_1bits = binarymessage.count('1')
-        print "\n\nMessage: %s\n - Hex: %s\n - Bin: %s\n - Count 1s: %d" % \
+        self.__checkDataMD5Sum()
+
+        print "\n\nMessage: %s\n - Hex: %s\n - Bin: %s" % \
                 ([ ord(x) for x in self.message ],
                     self.message.encode('hex'),
-                    binarymessage,
-                    num_1bits)
+                    binarymessage)
 
     def disconnect(self):
+        self.client.send('0')
         self.client.close()
 
