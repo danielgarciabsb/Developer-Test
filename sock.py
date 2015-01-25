@@ -62,11 +62,11 @@ class SockClient(object):
                 [ x.encode('hex') for x in self.md5sum])
         return self.md5sum
 
-    def __getDataAndParity(self):
+    def __getData(self):
         try:
             self.data
         except:
-            self.data = self.__receiveBytes(sum([ ord(x) for x in self.packetlength ]) - 16 - 2)
+            self.data = self.__receiveBytes(sum([ ord(x) for x in self.packetlength ]) - 16 - 2 - 1)
         # Debug
         print "\n\nData: %s\n - Bytes: %s\n - String: %s\n - Hex: %s" % \
                 (self.data.encode('hex'),
@@ -75,23 +75,52 @@ class SockClient(object):
                 [ x.encode('hex') for x in self.data])
         return self.data
 
-    def __checkMessageParity(self):
-        pass
+    def __getParityByte(self):
+        try:
+            self.parity
+        except:
+            self.parity = self.__receiveBytes(1)
+        # Debug
+        print "\n\nParity: %s\n - Bytes: %s\n - String: %s\n - Hex: %s" % \
+                (self.parity.encode('hex'),
+                [ ord(x) for x in self.parity ],
+                self.parity.encode('hex'),
+                [ x.encode('hex') for x in self.parity])
+        return self.parity
+
+    def __checkMessageParity(self, bits):
+        
+        if(bits[:len(bits)-8].count('1') % 2 == 0):
+            print "Message number of 1 bits is Even, checking parity byte..."
+            print "Parity byte is %s" % bits[len(bits)-8:]
+        else:
+            print "Message number of 1 bits is ODD, checking parity byte..."
+            print "Parity byte is %s" % bits[len(bits)-8:]
+        
+        if(bits.count('1') % 2 == 0):
+            print "Even number of 1 bits, message parity is ok"
+        else:
+            print "Odd number of 1 bits, message parity is not ok"
 
     def getMessage(self):
         self.__getPacketLength()
         self.__getMD5Sum()
-        self.__getDataAndParity()
-        self.__checkMessageParity()
+        self.__getData()
+        self.__getParityByte()
 
-        self.message = self.packetlength + self.md5sum + self.data
+        self.message = self.packetlength + self.md5sum + self.data + self.parity
+        
         bmsize = len(self.message.encode('hex')) * 4
         binarymessage = (bin(int(self.message.encode('hex'), 16))[2:]).zfill(bmsize)
+        
+        self.__checkMessageParity(binarymessage)
+        
+        num_1bits = binarymessage.count('1')
         print "\n\nMessage: %s\n - Hex: %s\n - Bin: %s\n - Count 1s: %d" % \
                 ([ ord(x) for x in self.message ],
                     self.message.encode('hex'),
                     binarymessage,
-                    binarymessage.count('1'))
+                    num_1bits)
 
     def disconnect(self):
         self.client.close()
