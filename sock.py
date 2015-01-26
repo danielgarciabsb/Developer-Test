@@ -35,9 +35,10 @@ class SockClient(object):
         packetlength = self.__receiveBytes(2)
         # Debug
         print "\n\nPacket Length: %d\n - Bytes: %s\n - Hex: %s" % \
-            (sum([ ord(x) for x in packetlength ]),
+            (int(''.join([ x.encode('hex') for x in packetlength ]),16),
                 [ ord(x) for x in packetlength ],
                 [ x.encode('hex') for x in packetlength])
+
         return packetlength
 
     def __getMD5Sum(self):
@@ -120,6 +121,8 @@ class SockClient(object):
 
         nm_length = 2 + 16 + len(decodedmessage) + 1
         hexnmlength = hex(nm_length)[2:]
+	if (len(hexnmlength) == 3):
+            hexnmlength = '0'+hexnmlength
         print "\nNM length: %d - Hex: %s" % (nm_length, hexnmlength)
         message_length = [hexnmlength[i:i+2] for i in range(0, len(hexnmlength), 2)]
         
@@ -132,6 +135,7 @@ class SockClient(object):
             print nm_length
         else:
             nm_length = message_length
+
         # Fim do Miau
 
         nm_newmd5 = hashlib.md5()
@@ -183,7 +187,7 @@ class SockClient(object):
         print "Client: Receiving new message..."
         packetlength = self.__getPacketLength()
         md5sum       = self.__getMD5Sum()
-        data         = self.__getData(sum([ ord(x) for x in packetlength ]) - 16 - 2 - 1)
+        data         = self.__getData(int(''.join([ x.encode('hex') for x in packetlength ]),16) - 16 - 2 - 1)
         parity       = self.__getParityByte()
 
         message = packetlength + md5sum + data + parity
@@ -219,10 +223,12 @@ class SockClient(object):
 
     def getServerResponse(self):
         print "Client: Getting server response..."
-        packetlength = self.__getPacketLength()
+        
+	packetlength = self.__getPacketLength()
         md5sum       = self.__getMD5Sum()
-        data         = self.__getData(sum([ ord(x) for x in packetlength ]) - 16 - 2 - 1)
+        data         = self.__getData(int(''.join([ x.encode('hex') for x in packetlength ]),16) - 16 - 2 - 1)
         parity       = self.__getParityByte()
+
         message = packetlength + md5sum + data + parity
         
         binarymessage = (bin(int(message.encode('hex'), 16))[2:]).zfill(len(message.encode('hex')) * 4)
