@@ -104,11 +104,13 @@ class SockClient(object):
         
         if(num_1bits % 2 == 0):
             print "Even number of 1 bits (%d), message parity is ok" % num_1bits
+            return 0
         else:
             print "Odd number of 1 bits (%d), message parity is not ok" % num_1bits
+            return 1
 
     def __checkDataMD5Sum(self):
-        newmd5 = hashlib.md5(binascii.unhexlify(self.data.encode('hex'))).hexdigest()
+        newmd5 = hashlib.md5(self.data).hexdigest()
         if(newmd5 == self.md5sum.encode('hex')):
             print "Data MD5 sum is OK %s == %s" %  (self.md5sum.encode('hex'), newmd5)
         else:
@@ -130,7 +132,58 @@ class SockClient(object):
         self.decodedmessage = [ chr(int(x,16) ^ self.cipherkey) for x in mdata ]
         print self.decodedmessage
         print "Decoded data: %s" % ''.join(self.decodedmessage)
+        self.decodedmessage = [ x.encode('hex') for x in self.decodedmessage]
+        print self.decodedmessage
         return self.decodedmessage
+
+    def __createMessage(self):
+
+        nm_decodedmessage = self.decodedmessage
+
+        datastr = ''.join(self.decodedmessage)
+        print "\nDecoded data str: %s" % datastr
+
+        md5sum = hashlib.md5(datastr).hexdigest()
+        print "\nNM decoded data MD5 sum: %s" % md5sum
+        nm_md5sum = [md5sum[i:i+2] for i in range(0, len(md5sum), 2)]
+        print nm_md5sum
+
+        nm_parity = 0x0
+
+        nm_length = 2 + 16 + len(self.decodedmessage)
+        hexnmlength = hex(nm_length)[2:]
+        print "\nNM length: %d - Hex: %s" % (nm_length, hexnmlength)
+        nm_length = [hexnmlength[i:i+2] for i in range(0, len(hexnmlength), 2)]
+
+        nm_message = []
+        nm_message.extend(nm_length)
+        nm_message.extend(nm_md5sum)
+        nm_message.extend(nm_decodedmessage)
+
+        print "NM message: "
+        print nm_message
+
+        nm_binary = (bin(int(''.join(nm_message), 16))[2:]).zfill(len(''.join(nm_message)) * 4)
+
+        print "\nNM binary: %s" % nm_binary
+
+        nm_parity = self.__checkMessageParity(nm_binary)
+
+        nm_parity = [nm_parity]
+        nm_parity = [''.join('{:02x}'.format(x) for x in nm_parity)]
+        nm_message.extend(nm_parity)
+
+        nm_binary = (bin(int(''.join(nm_message), 16))[2:]).zfill(len(''.join(nm_message)) * 4)        
+        nm_parity = self.__checkMessageParity(nm_binary)
+
+        print "\nNM binary: %s" % nm_binary
+
+        print "NM message: "
+        print nm_message
+
+        self.nm_message = ''.join(nm_message)
+
+        print "NM message str: %s" % self.nm_message
 
     def getMessage(self):
         self.__getPacketLength()
@@ -140,8 +193,7 @@ class SockClient(object):
 
         self.message = self.packetlength + self.md5sum + self.data + self.parity
         
-        bmsize = len(self.message.encode('hex')) * 4
-        binarymessage = (bin(int(self.message.encode('hex'), 16))[2:]).zfill(bmsize)
+        binarymessage = (bin(int(self.message.encode('hex'), 16))[2:]).zfill(len(self.message.encode('hex')) * 4)
         
         print "\n\nMessage: %s\n - Hex: %s\n - Bin: %s" % \
                 ([ ord(x) for x in self.message ],
@@ -154,9 +206,10 @@ class SockClient(object):
         self.__getMostCommonByte()
         self.__getCipherKey()
         self.__decodeData()
-        
+        self.__createMessage()
+        print self.__receiveBytes(300).encode('hex')
 
     def disconnect(self):
-        self.client.send('0')
+        self.client.send(self.nm_message.decode('hex'))
         self.client.close()
 
