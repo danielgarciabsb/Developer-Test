@@ -8,7 +8,8 @@ import sock
 
 client = sock.SockClient()
 client.connect("191.237.249.140",64006)
-client.getEncryptedMessage()
-client.sendDecodedMessage()
+encryptedMessagedata = client.getEncryptedMessage()
+decodedmessage = client.getDecodedMessage(encryptedMessagedata)
+client.sendDecodedMessage(decodedmessage)
 client.getServerResponse()
 client.disconnect()
