@@ -110,11 +110,12 @@ class SockClient(object):
             return 1
 
     def __checkDataMD5Sum(self):
-        newmd5 = hashlib.md5(self.data).hexdigest()
-        if(newmd5 == self.md5sum.encode('hex')):
-            print "Data MD5 sum is OK %s == %s" %  (self.md5sum.encode('hex'), newmd5)
+        newmd5 = hashlib.md5()
+        newmd5.update(self.data)
+        if(newmd5.hexdigest() == self.md5sum.encode('hex')):
+            print "Data MD5 sum is OK %s == %s" %  (self.md5sum.encode('hex'), newmd5.hexdigest())
         else:
-            print "Data MD5 sum is NOT ok %s != %s" % (self.md5sum.encode('hex'), newmd5)
+            print "Data MD5 sum is NOT ok %s != %s" % (self.md5sum.encode('hex'), newmd5.hexdigest())
 
     def __getMostCommonByte(self):
         counts = collections.Counter([ x.encode('hex') for x in self.data]).most_common()
@@ -143,7 +144,11 @@ class SockClient(object):
         datastr = ''.join(self.decodedmessage)
         print "\nDecoded data str: %s" % datastr
 
-        md5sum = hashlib.md5(datastr).hexdigest()
+        newmd5 = hashlib.md5()
+        newmd5.update(datastr)
+
+        md5sum = newmd5.hexdigest()
+
         print "\nNM decoded data MD5 sum: %s" % md5sum
         nm_md5sum = [md5sum[i:i+2] for i in range(0, len(md5sum), 2)]
         print nm_md5sum
@@ -153,7 +158,17 @@ class SockClient(object):
         nm_length = 2 + 16 + len(self.decodedmessage)
         hexnmlength = hex(nm_length)[2:]
         print "\nNM length: %d - Hex: %s" % (nm_length, hexnmlength)
-        nm_length = [hexnmlength[i:i+2] for i in range(0, len(hexnmlength), 2)]
+        message_length = [hexnmlength[i:i+2] for i in range(0, len(hexnmlength), 2)]
+        
+        # Miau por falta de conhecimento como adicionar 0's em 2 bytes hex no python
+        if(nm_length <= 0xff):
+            print 'True'
+            zb = ['00']
+            zb.extend(message_length)
+            nm_length = zb
+            print nm_length
+        else:
+            nm_length = message_length
 
         nm_message = []
         nm_message.extend(nm_length)
@@ -207,7 +222,6 @@ class SockClient(object):
         self.__getCipherKey()
         self.__decodeData()
         self.__createMessage()
-        print self.__receiveBytes(300).encode('hex')
 
     def disconnect(self):
         self.client.send(self.nm_message.decode('hex'))
