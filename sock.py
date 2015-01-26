@@ -20,14 +20,6 @@ class SockClient(object):
             print >> sys.stderr, e
             sys.exit()
 
-    def connect(self, address, port):
-        try:
-            self.client.connect((address, port))
-        except socket.error, e:
-            print >> sys.stderr, e
-            self.client.close()
-            sys.exit()
-
     def __receiveBytes(self, amount):
         try:
             received = self.client.recv(amount)
@@ -93,7 +85,7 @@ class SockClient(object):
 
         # Check if parity byte exists
         if(int(bits[len(bits)-8:]) > 1):
-            print "Parity byte does not exist!"
+            print "Parity byte does not exists!"
         else:
             if(bits[:len(bits)-8].count('1') % 2 == 0):
                 print "Message number of 1 bits is Even (%d), checking parity byte..." % bits[:len(bits)-8].count('1')
@@ -138,7 +130,7 @@ class SockClient(object):
         print "\nDecoded data str: %s" % self.decodedmessage
         return self.decodedmessage
 
-    def __createMessage(self):
+    def __createDecodedMessage(self):
 
         nm_length = 2 + 16 + len(self.decodedmessage) + 1
         hexnmlength = hex(nm_length)[2:]
@@ -154,6 +146,7 @@ class SockClient(object):
             print nm_length
         else:
             nm_length = message_length
+        # Fim do Miau
 
         nm_newmd5 = hashlib.md5()
         nm_newmd5.update(self.decodedmessage)
@@ -163,9 +156,9 @@ class SockClient(object):
         nm_md5sum = [md5sum[i:i+2] for i in range(0, len(md5sum), 2)]
         print nm_md5sum
 
-        nm_parity = 0x0
-
         nm_decodedmessage = [ x.encode('hex') for x in self.decodedmessage]
+
+        nm_parity = 0x0
 
         nm_message = []
         nm_message.extend(nm_length)
@@ -185,6 +178,7 @@ class SockClient(object):
         nm_parity = [''.join('{:02x}'.format(x) for x in nm_parity)]
         nm_message.extend(nm_parity)
 
+        # Recheck message parity
         nm_binary = (bin(int(''.join(nm_message), 16))[2:]).zfill(len(''.join(nm_message)) * 4)        
         nm_parity = self.__checkMessageParity(nm_binary)
 
@@ -197,7 +191,8 @@ class SockClient(object):
 
         print "NM message str: %s" % self.nm_message
 
-    def getMessage(self):
+    def getEncryptedMessage(self):
+        print "Client: Receiving new message..."
         self.__getPacketLength()
         self.__getMD5Sum()
         self.__getData()
@@ -218,8 +213,23 @@ class SockClient(object):
         self.__getMostCommonByte()
         self.__getCipherKey()
         self.__decodeData()
-        self.__createMessage()
+
+    def sendDecodedMessage(self):
+        print "Client: Creating decoded message..."
+        self.__createDecodedMessage()
+        print "Client: Sending decoded message..."
+        self.client.send(self.nm_message.decode('hex'))
+
+    def getServerResponse(self):
+        pass
+
+    def connect(self, address, port):
+        try:
+            self.client.connect((address, port))
+        except socket.error, e:
+            print >> sys.stderr, e
+            self.client.close()
+            sys.exit()
 
     def disconnect(self):
-        self.client.send(self.nm_message.decode('hex'))
         self.client.close()
