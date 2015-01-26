@@ -100,18 +100,16 @@ class SockClient(object):
 
     def __getMostCommonByte(self, data):
         counts = collections.Counter([ x.encode('hex') for x in data]).most_common()
-        mostcommonbyte = counts[0][0]
-        print "Most commom byte in data is hex: %s" % mostcommonbyte
-        return mostcommonbyte
+        self.mostcommonbyte = counts[0][0]
+        print "Most commom byte in data is hex: %s" % self.mostcommonbyte
 
-    def __getCipherKey(self, mostcommonbyte):
-        cipherkey = int(mostcommonbyte,16) ^ 0x20
-        print "Cipherkey: Int: %s - Hex: %s" % (cipherkey, hex(cipherkey)[2:])
-        return cipherkey
+    def __getCipherKey(self):
+        self.cipherkey = int(self.mostcommonbyte,16) ^ 0x20
+        print "Cipherkey: Int: %s - Hex: %s" % (self.cipherkey, hex(self.cipherkey)[2:])
 
-    def __decodeData(self, cipherkey, data):
+    def __decodeData(self, data):
         mdata = [ x.encode('hex') for x in data ]
-        decodedmessage = [ chr(int(x,16) ^ cipherkey) for x in mdata ]
+        decodedmessage = [ chr(int(x,16) ^ self.cipherkey) for x in mdata ]
         print decodedmessage
         print "Decoded data hex: %s" % [ x.encode('hex') for x in decodedmessage]
         decodedmessage = ''.join(decodedmessage)
@@ -175,9 +173,11 @@ class SockClient(object):
         print "NM message: "
         print nm_message
 
-        self.nm_message = ''.join(nm_message)
+        createdmessage = ''.join(nm_message)
 
-        print "NM message str: %s" % self.nm_message
+        print "NM message str: %s" % createdmessage
+
+        return createdmessage
 
     def getEncryptedMessage(self):
         print "Client: Receiving new message..."
@@ -197,23 +197,45 @@ class SockClient(object):
 
         self.__checkMessageParity(binarymessage)
         self.__checkDataMD5Sum(data, md5sum.encode('hex'))
+        self.__getMostCommonByte(data)
+        self.__getCipherKey()
 
         return data
 
     def getDecodedMessage(self, encryptedMessagedata):
-        mostcommonbyte = self.__getMostCommonByte(encryptedMessagedata)
-        cipherkey = self.__getCipherKey(mostcommonbyte)
-        decodedmessage = self.__decodeData(cipherkey, encryptedMessagedata)
+        decodedmessage = self.__decodeData(encryptedMessagedata)
         return decodedmessage
 
     def sendDecodedMessage(self, decodedmessage):
         print "Client: Creating decoded message..."
-        self.__createDecodedMessagePacket(decodedmessage)
+        createdmessage = self.__createDecodedMessagePacket(decodedmessage)
         print "Client: Sending decoded message..."
-        self.client.send(self.nm_message.decode('hex'))
+        try:
+            self.client.send(createdmessage.decode('hex'))
+        except socket.error, e:
+            print "Error sending decoded data: %s" % e
+            sys.exit(1)
+        print "Client: Decoded message has been successfully sent!"
 
     def getServerResponse(self):
-        pass
+        print "Client: Getting server response..."
+        packetlength = self.__getPacketLength()
+        md5sum       = self.__getMD5Sum()
+        data         = self.__getData(sum([ ord(x) for x in packetlength ]) - 16 - 2 - 1)
+        parity       = self.__getParityByte()
+        message = packetlength + md5sum + data + parity
+        
+        binarymessage = (bin(int(message.encode('hex'), 16))[2:]).zfill(len(message.encode('hex')) * 4)
+        
+        print "\n\nMessage: %s\n - Hex: %s\n - Bin: %s" % \
+                ([ ord(x) for x in message ],
+                    message.encode('hex'),
+                    binarymessage)
+
+        self.__checkMessageParity(binarymessage)
+        self.__checkDataMD5Sum(data, md5sum.encode('hex'))
+
+        return data
 
     def connect(self, address, port):
         try:
